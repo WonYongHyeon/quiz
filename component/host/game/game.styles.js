@@ -45,3 +45,28 @@ export const QuizButton = styled.button`
     background-color: #16a34a;
   }
 `;
+
+export const CheckingScoreWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100vh;
+  padding: 20px;
+  box-sizing: border-box;
+  background-color: #f3f4f6;
+  font-size: 24px;
+  color: #4b5563;
+  font-weight: bold;
+  text-align: center;
+  animation: fadeIn 0.5s ease-in-out;
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+`;
