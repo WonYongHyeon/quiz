@@ -14,7 +14,7 @@ export default function Host() {
     setMasterCode(event.target.value);
   };
 
-  const onClickStart = () => {
+  const onClickStart = (path) => {
     if (masterCode === "") {
       toast.error("호스트 마스터 코드를 입력해주세요.");
       return;
@@ -25,7 +25,7 @@ export default function Host() {
       return;
     }
 
-    router.push(`/host/game`);
+    router.push(`/host/${path}`);
   };
 
   return (

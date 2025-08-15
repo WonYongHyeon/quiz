@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import HostGameUI from "./game.presenter";
 import Ably from "ably";
 import { toast } from "sonner";
@@ -10,87 +10,160 @@ const ably = new Ably.Realtime({
 });
 
 export default function HostGame() {
-  const [question, setQuestion] = useState("");
-  const [correctAnswer, setCorrectAnswer] = useState("");
-  const [timeLimit, setTimeLimit] = useState(0);
+  // ✅ 퀴즈 진행에 필요한 데이터는 Ably로부터 받아 저장합니다.
+  const [currentQuiz, setCurrentQuiz] = useState({
+    question: "",
+    timeLimit: 0,
+  });
+  const correctAnswerRef = useRef(""); // 정답은 ref에만 저장
+
   const [participants, setParticipants] = useState({});
-  const [isCheckingScore, setIsCheckingScore] = useState(false);
 
-  // ✅ 1. 최신 정답을 저장하기 위한 ref 생성
-  const correctAnswerRef = useRef(correctAnswer);
+  const [isCheckingAnswer, setIsCheckingAnswer] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [isQuizInProgress, setIsQuizInProgress] = useState(false);
 
-  const sendQuizChannelRef = useRef(null);
+  const [correctNicks, setCorrectNicks] = useState([]);
+  const [incorrectNicks, setIncorrectNicks] = useState([]);
+
   const updateScoreChannelRef = useRef(null);
   const timerRef = useRef(null);
 
-  const handleQuestionChange = (e) => setQuestion(e.target.value);
-  const handleAnswerChange = (e) => setCorrectAnswer(e.target.value);
-  const handelLimitChange = (e) => setTimeLimit(e.target.value);
+  const clickIsCheckingAnswer = () => {
+    setIsCheckingAnswer(false);
+    setShowLeaderboard(false);
+  };
 
-  // ✅ 2. correctAnswer 상태가 변경될 때마다 ref의 값을 업데이트
-  useEffect(() => {
-    correctAnswerRef.current = correctAnswer;
-  }, [correctAnswer]);
+  const handleShowLeaderboard = () => {
+    setShowLeaderboard(true);
+  };
 
-  const sendQuiz = () => {
-    // ... (기존 유효성 검사 로직은 동일)
-    if (
-      question.trim().length === 0 ||
-      correctAnswer.trim().length === 0 ||
-      timeLimit <= 0
-    ) {
-      toast.error("문제, 정답, 제한시간을 모두 올바르게 입력해주세요.");
-      return;
-    }
-
-    setIsCheckingScore(false);
-    setParticipants((prev) => {
-      const resetParticipants = { ...prev };
-      Object.keys(resetParticipants).forEach((nickname) => {
-        delete resetParticipants[nickname].answer;
-      });
-      return resetParticipants;
+  const startRound = (quizData) => {
+    // Ably로부터 받은 데이터로 상태 설정
+    setCurrentQuiz({
+      question: quizData.question,
+      timeLimit: quizData.timeLimit,
     });
+    correctAnswerRef.current = quizData.correctAnswer;
+    setIsQuizInProgress(true);
 
-    sendQuizChannelRef.current.publish("send-quiz", { question, timeLimit });
-    console.log("문제 출제:", { question, timeLimit });
+    setParticipants((prev) => {
+      const updated = { ...prev };
+      Object.keys(updated).forEach((nickname) => {
+        if (updated[nickname].currentRank) {
+          updated[nickname].prevRank = updated[nickname].currentRank;
+        }
+        delete updated[nickname].answer;
+      });
+      return updated;
+    });
 
     if (timerRef.current) clearTimeout(timerRef.current);
 
     timerRef.current = setTimeout(() => {
-      console.log("제한시간 종료! 점수를 계산합니다.");
-
       setParticipants((currentParticipants) => {
-        const updatedParticipants = JSON.parse(
-          JSON.stringify(currentParticipants)
-        );
-
-        Object.keys(updatedParticipants).forEach((nickname) => {
-          const participant = updatedParticipants[nickname];
-          // ✅ 4. 점수 계산 시 ref에 저장된 최신 정답을 사용
-          if (
-            participant.answer &&
-            participant.answer === correctAnswerRef.current.trim()
-          ) {
-            participant.score += 1;
+        const initialCorrect = [];
+        const initialIncorrect = [];
+        Object.entries(currentParticipants).forEach(([nickname, data]) => {
+          if (data.answer && data.answer === correctAnswerRef.current.trim()) {
+            initialCorrect.push(nickname);
+          } else {
+            initialIncorrect.push(nickname);
           }
         });
 
-        console.log("업데이트된 참가자 점수:", updatedParticipants);
-        updateScoreChannelRef.current.publish("update-score", {
-          participants: updatedParticipants,
-          isCheckingScore: true,
-        });
+        setCorrectNicks(initialCorrect);
+        setIncorrectNicks(initialIncorrect);
 
-        setIsCheckingScore(true);
-        return updatedParticipants;
+        setIsQuizInProgress(false);
+        setIsCheckingAnswer(true);
+        setShowLeaderboard(false);
+
+        return currentParticipants;
       });
-    }, timeLimit * 1000);
+    }, quizData.timeLimit * 1000);
+  };
+
+  // ✅ 3. dnd-kit 드래그 완료시 실행될 함수
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+
+    if (!over) return; // 드롭 위치가 없으면 종료
+
+    const draggedNick = active.id;
+    const droppedContainerId = over.id; // 'correct-group' 또는 'incorrect-group'
+
+    // 카드가 있던 원래 그룹을 찾음
+    const sourceContainerId = correctNicks.includes(draggedNick)
+      ? "correct-group"
+      : "incorrect-group";
+
+    // 같은 그룹 내에서 이동한 경우는 무시
+    if (sourceContainerId === droppedContainerId) {
+      return;
+    }
+
+    // 그룹 간 이동 처리
+    if (droppedContainerId === "correct-group") {
+      setIncorrectNicks((prev) => prev.filter((nick) => nick !== draggedNick));
+      setCorrectNicks((prev) => [...prev, draggedNick]);
+    } else {
+      setCorrectNicks((prev) => prev.filter((nick) => nick !== draggedNick));
+      setIncorrectNicks((prev) => [...prev, draggedNick]);
+    }
+  };
+
+  // ✅ 4. '점수 확정' 버튼을 눌렀을 때 실행될 함수
+  const handleFinalizeScores = () => {
+    setParticipants((prev) => {
+      const updatedParticipants = JSON.parse(JSON.stringify(prev));
+
+      // 최종적으로 '정답 그룹'에 있는 사람들에게만 +1점
+      correctNicks.forEach((nickname) => {
+        if (updatedParticipants[nickname]) {
+          updatedParticipants[nickname].score += 1;
+        }
+      });
+
+      // 점수 기반으로 랭킹 재계산 (기존 로직 재활용)
+      const sortedByScore = Object.entries(updatedParticipants).sort(
+        ([, a], [, b]) => b.score - a.score
+      );
+      let lastScore = -1;
+      let currentRank = 0;
+      sortedByScore.forEach(([nickname], index) => {
+        const participant = updatedParticipants[nickname];
+        if (participant.score !== lastScore) {
+          currentRank = index + 1;
+        }
+        participant.currentRank = currentRank;
+        lastScore = participant.score;
+      });
+
+      // Ably로 최종 결과 전송
+      updateScoreChannelRef.current.publish("update-score", {
+        participants: updatedParticipants,
+        isCheckingScore: true,
+      });
+
+      return updatedParticipants;
+    });
+
+    // 리더보드 화면으로 전환
+    setShowLeaderboard(true);
   };
 
   // ✅ 3. Ably 채널 설정은 컴포넌트 마운트 시 한 번만 실행
   useEffect(() => {
-    sendQuizChannelRef.current = ably.channels.get("send-quiz");
+    const controlChannel = ably.channels.get("quiz-control");
+
+    const handleNewQuiz = (message) => {
+      toast.info("새로운 문제가 출제되었습니다!");
+      startRound(message.data);
+    };
+
+    controlChannel.subscribe("new-quiz", handleNewQuiz);
+
     updateScoreChannelRef.current = ably.channels.get("update-score");
     const receiveAnswerChannel = ably.channels.get("receive-answer");
     const checkChannel = ably.channels.get("check-nickname-channel");
@@ -123,7 +196,14 @@ export default function HostGame() {
           status: isTaken ? "taken" : "ok",
         });
         if (!isTaken) {
-          return { ...prev, [requestedNickname]: { score: 0 } };
+          return {
+            ...prev,
+            [requestedNickname]: {
+              score: 0,
+              prevRank: -1, // "신규 유저"를 의미하는 값
+              currentRank: null,
+            },
+          };
         }
         return prev;
       });
@@ -135,26 +215,51 @@ export default function HostGame() {
     // 컴포넌트 언마운트 시 모든 구독을 해제하고 채널을 정리
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
-
-      // unsubscribe 후 release 하는 것이 더 안정적일 수 있습니다.
+      controlChannel.unsubscribe(handleNewQuiz);
       receiveAnswerChannel.unsubscribe(handleReceiveAnswer);
       checkChannel.unsubscribe(handleCheckNickname);
-
-      ably.channels.release("send-quiz");
-      ably.channels.release("update-score");
-      ably.channels.release("receive-answer");
-      ably.channels.release("check-nickname-channel");
     };
   }, []); // 의존성 배열을 비워서 한 번만 실행되도록 설정
 
+  const sortedData = useMemo(() => {
+    // 참가자 객체를 배열로 변환
+    const participantsArray = Object.keys(participants).map((nickname) => ({
+      nickname,
+      ...participants[nickname],
+    }));
+
+    // [정렬 로직 1] 라운드 결과: 정답자 우선 정렬
+    const roundResults = [...participantsArray].sort((a, b) => {
+      const isACorrect =
+        a.answer && a.answer === correctAnswerRef.current.trim();
+      const isBCorrect =
+        b.answer && b.answer === correctAnswerRef.current.trim();
+      // isBCorrect가 true(1)이면 isACorrect가 false(0)일 때 앞으로 온다.
+      return Number(isBCorrect) - Number(isACorrect);
+    });
+
+    // [정렬 로직 2] 전체 리더보드: 점수 내림차순 정렬
+    const leaderboard = [...participantsArray].sort(
+      (a, b) => b.score - a.score
+    );
+
+    return { roundResults, leaderboard };
+  }, [participants, correctAnswerRef.current]); // participants나 correctAnswer가 바뀔 때만 재계산
+
   return (
     <HostGameUI
-      handleQuestionChange={handleQuestionChange}
-      handleAnswerChange={handleAnswerChange}
-      handelLimitChange={handelLimitChange}
-      sendQuiz={sendQuiz}
-      isCheckingScore={isCheckingScore}
+      isCheckingAnswer={isCheckingAnswer}
+      clickIsCheckingAnswer={clickIsCheckingAnswer}
+      showLeaderboard={showLeaderboard}
       participants={participants}
+      leaderboard={sortedData.leaderboard}
+      correctNicks={correctNicks}
+      incorrectNicks={incorrectNicks}
+      handleDragEnd={handleDragEnd}
+      handleFinalizeScores={handleFinalizeScores}
+      isQuizInProgress={isQuizInProgress}
+      question={currentQuiz.question}
+      timeLimit={currentQuiz.timeLimit}
     />
   );
 }
