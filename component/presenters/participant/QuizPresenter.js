@@ -100,25 +100,71 @@ export default function QuizPresenter({
             {qnaList.length === 0 ? (
               <p className={styles.emptyMessage}>아직 질문/답변이 없습니다.</p>
             ) : (
-              qnaList.map((qna, index) => (
-                <div
-                  key={index}
-                  className={
-                    qna.type === "answer"
-                      ? styles.qnaAnswerItem
-                      : styles.qnaQuestionItem
-                  }
-                >
-                  <p>
-                    <strong>{qna.nickname}</strong>: {qna.text}
-                  </p>
-                  {qna.hostAnswer && (
-                    <p className={styles.hostResponse}>
-                      └ 🧑‍💻 호스트 답변: {qna.hostAnswer}
+              qnaList.map((qna, index) => {
+                // 1. ⭐️ 개인 상세 피드백 렌더링 (type: my-feedback)
+                // 이 항목은 본인만 가지고 있으며, 상세한 답안 텍스트까지 표시합니다.
+                if (qna.type === "my-feedback") {
+                  return (
+                    <div
+                      key={index}
+                      className={
+                        qna.isCorrect
+                          ? styles.qnaCorrectFeedback
+                          : styles.qnaIncorrectFeedback
+                      }
+                    >
+                      <p>🧑‍💻 **호스트 처리 결과 (본인 기록)**</p>
+                      <p className={styles.hostResponse}>
+                        **[내가 제출한 답안]** "{qna.text}" -{" "}
+                        {qna.isCorrect ? "🎉 정답 처리" : "❌ 오답 처리"}
+                      </p>
+                    </div>
+                  );
+                }
+
+                // 2. ⭐️ 공용 피드백 렌더링 (type: feedback)
+                // 다른 사람의 기록은 이 로직으로 모두에게 표시되며, 답안 내용도 포함합니다.
+                if (qna.type === "feedback") {
+                  const decision = qna.isCorrect ? "🎉 정답" : "❌ 오답";
+                  const itemStyle = qna.isCorrect
+                    ? styles.qnaCorrectFeedback
+                    : styles.qnaIncorrectFeedback;
+
+                  return (
+                    <div key={index} className={itemStyle}>
+                      {/* <p>🧑‍💻 **참가자 정답 처리 공지**</p> */}
+                      {/* 🚨 수정: 제출된 답안 내용(qna.text)을 여기에 추가합니다. */}
+                      <p className={styles.hostResponse}>
+                        "{qna.nickname}" 님의 답안이 {decision} 처리되었습니다.
+                      </p>
+                      <p className={styles.hostResponse}>
+                        [제출 답안] "{qna.text}"
+                      </p>
+                    </div>
+                  );
+                }
+
+                // 3. 기존 질문/QnA 렌더링
+                return (
+                  <div
+                    key={index}
+                    className={
+                      qna.type === "answer"
+                        ? styles.qnaAnswerItem
+                        : styles.qnaQuestionItem
+                    }
+                  >
+                    <p>
+                      <strong>{qna.nickname}</strong>: {qna.text}
                     </p>
-                  )}
-                </div>
-              ))
+                    {qna.hostAnswer && (
+                      <p className={styles.hostResponse}>
+                        └ 🧑‍💻 답변: {qna.hostAnswer}
+                      </p>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
         </section>

@@ -1,4 +1,4 @@
-// containers/host/HostContainer.js (수정된 전체 코드)
+// containers/host/HostContainer.js
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import HostPresenter from "../../presenters/host/HostPresenter";
@@ -213,16 +213,23 @@ export default function HostContainer() {
         )
       );
 
+      const feedbackData = {
+        type: "feedback", // ⭐️ QNA_CHANNEL에 발행할 때 사용될 타입
+        nickname: selectedInput.nickname,
+        text: selectedInput.text,
+        isCorrect: isCorrect,
+        timestamp: Date.now(),
+      };
+
       // ⭐️ 정답/오답 처리 피드백 메시지 전송 (퀴즈 리셋 여부와 관계없이 실행)
       try {
+        // 1) 개인 참가자 채널에 피드백 전송 (개별 알림/기록용)
         const participantChannel = ably.channels.get(PARTICIPANT_CHANNEL);
-        // 참가자가 자신의 활동 기록을 업데이트할 수 있도록 데이터 전송
-        await participantChannel.publish("answer-feedback", {
-          nickname: selectedInput.nickname,
-          text: selectedInput.text,
-          isCorrect: isCorrect,
-          timestamp: Date.now(),
-        });
+        await participantChannel.publish("answer-feedback", feedbackData);
+
+        // 2) ⭐️ QNA_CHANNEL에 피드백 전송 (모두에게 공유되는 공개 기록용)
+        const qnaChannel = ably.channels.get(QNA_CHANNEL);
+        await qnaChannel.publish("qna-update", feedbackData);
       } catch (err) {
         console.error("정답 피드백 전송 오류:", err, selectedInput);
       }
@@ -272,7 +279,7 @@ export default function HostContainer() {
     [inputs]
   );
 
-  // ⭐️ 8. 입력 항목 삭제 핸들러 추가
+  // 8. 입력 항목 삭제 핸들러 추가
   const handleDeleteInput = useCallback((inputId) => {
     Swal.fire({
       title: "정말로 삭제하시겠습니까?",
@@ -314,7 +321,7 @@ export default function HostContainer() {
     );
   }
 
-  // 10. Presenter에 전달할 데이터 준비 (번호 수정)
+  // 10. Presenter에 전달할 데이터 준비
   // 미처리 질문: 답변이 없는 질문
   const questions = inputs.filter(
     (i) => i.type === "question" && !i.hostAnswer
@@ -346,7 +353,7 @@ export default function HostContainer() {
       onQuizSubmit={handleQuizSubmit}
       onHostAnswerSubmit={handleHostAnswerSubmit}
       onAnswerDecision={handleAnswerDecision}
-      onDeleteInput={handleDeleteInput} // ⭐️ 삭제 핸들러 추가
+      onDeleteInput={handleDeleteInput}
     />
   );
 }
