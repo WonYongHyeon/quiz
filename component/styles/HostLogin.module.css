@@ -1,0 +1,82 @@
+/* styles/HostLogin.module.css (Dark Mode) */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: #1a1a1a; /* 어두운 배경색 */
+  padding: 20px;
+}
+
+.title {
+  font-size: 2.5rem;
+  color: #e0e0e0; /* 밝은 텍스트 색상 */
+  margin-bottom: 20px;
+  font-weight: 600;
+}
+
+.form {
+  background: #2c2c2c; /* 폼 배경색 */
+  padding: 30px 40px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); /* 그림자 진하게 */
+  width: 100%;
+  max-width: 400px;
+}
+
+.label {
+  font-size: 1rem;
+  color: #bdbdbd; /* 밝은 회색 텍스트 */
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+
+.input {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 20px;
+  border: 1px solid #444; /* 어두운 테두리 */
+  background-color: #333; /* 입력 필드 배경색 */
+  color: #e0e0e0; /* 입력 텍스트 색상 */
+  border-radius: 8px;
+  font-size: 1rem;
+  box-sizing: border-box;
+  transition: border-color 0.3s;
+}
+
+.input:focus {
+  border-color: #00aaff; /* 포커스 시 밝은 파란색 */
+  outline: none;
+}
+
+.error {
+  color: #ff6b6b; /* 눈에 잘 띄는 경고색 */
+  margin-top: -10px;
+  margin-bottom: 15px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+.button {
+  width: 100%;
+  padding: 12px;
+  background-color: #007bff; /* 주 버튼 색상 */
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.1s;
+  font-weight: 600;
+}
+
+.button:hover {
+  background-color: #0056b3;
+}
+
+.button:active {
+  transform: translateY(1px);
+}

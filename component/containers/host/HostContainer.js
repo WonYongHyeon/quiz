@@ -1,7 +1,8 @@
-// containers/host/HostContainer.js
+// containers/host/HostContainer.js (수정된 전체 코드)
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import HostPresenter from "../../presenters/host/HostPresenter";
+import HostLogin from "./HostLogin";
 import {
   HOST_CHANNEL,
   PARTICIPANT_CHANNEL,
@@ -15,6 +16,7 @@ import Swal from "sweetalert2";
 const PARTICIPANTS_KEY = "host_participants";
 const INPUTS_KEY = "host_inputs";
 const QUIZ_KEY = "host_current_quiz";
+const AUTH_KEY = "host_authenticated";
 
 /**
  * sessionStorage에 상태를 저장하는 함수
@@ -31,6 +33,7 @@ export default function HostContainer() {
   const [participants, setParticipants] = useState([]);
   const [inputs, setInputs] = useState([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // 2. 무한 루프 방지를 위해 participants의 최신 값을 참조할 Ref 사용
   const participantsRef = useRef(participants);
@@ -38,9 +41,12 @@ export default function HostContainer() {
     participantsRef.current = participants;
   }, [participants]);
 
-  // 3. Hydration 및 Ably 구독 설정
+  // 3. ⭐️ 초기 데이터 로드 및 Ably 구독 설정 (두 개의 useEffect를 통합)
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    let participantChannel;
+    let nicknameCheckHandler, newParticipantHandler, participantInputHandler;
+
+    if (typeof window !== "undefined" && !isLoaded) {
       // a. 데이터 로드 및 상태 설정 (Hydration 오류 방지)
       try {
         setCurrentQuiz(JSON.parse(sessionStorage.getItem(QUIZ_KEY) || '""'));
@@ -48,70 +54,83 @@ export default function HostContainer() {
           JSON.parse(sessionStorage.getItem(PARTICIPANTS_KEY) || "[]")
         );
         setInputs(JSON.parse(sessionStorage.getItem(INPUTS_KEY) || "[]"));
+        // ⭐️ 인증 상태 로드 (setState는 한 번만 실행되도록 보장)
+        setIsAuthenticated(sessionStorage.getItem(AUTH_KEY) === "true");
       } catch (e) {
         console.error("Failed to load state from sessionStorage:", e);
       }
       setIsLoaded(true);
     }
 
-    // b. Ably 채널 구독 (컴포넌트 마운트 시 단 한 번만 실행)
-    const participantChannel = ably.channels.get(PARTICIPANT_CHANNEL);
+    // b. Ably 채널 구독 (isAuthenticated 상태가 true일 때만 구독을 시작합니다.)
+    if (isAuthenticated) {
+      participantChannel = ably.channels.get(PARTICIPANT_CHANNEL);
 
-    // 닉네임 중복 체크 요청 처리 (participantsRef 사용)
-    const nicknameCheckHandler = async (message) => {
-      const { nickname: nicknameToCheck, responseTo: requestId } = message.data;
-      const isAvailable = !participantsRef.current.includes(nicknameToCheck);
+      // 닉네임 중복 체크 요청 처리
+      nicknameCheckHandler = async (message) => {
+        const { nickname: nicknameToCheck, responseTo: requestId } =
+          message.data;
+        const isAvailable = !participantsRef.current.includes(nicknameToCheck);
 
-      const responseChannel = ably.channels.get(
-        `participant-response:${requestId}`
-      );
-      await responseChannel.publish("check-response", {
-        available: isAvailable,
-      });
-    };
-    participantChannel.subscribe("nickname-check", nicknameCheckHandler);
-
-    // 새 참가자 등록
-    const newParticipantHandler = (message) => {
-      const nickname = message.data.nickname;
-      setParticipants((prev) => {
-        if (!prev.includes(nickname)) {
-          return [...prev, nickname];
-        }
-        return prev;
-      });
-    };
-    participantChannel.subscribe("new-participant", newParticipantHandler);
-
-    // 참가자 입력(질문/정답) 받기 핸들러: 최신이 아래로 가도록 맨 뒤에 추가
-    const participantInputHandler = (message) => {
-      console.log("참가자 입력 수신:", message.data);
-      const input = {
-        id: uuidv4(),
-        nickname: message.data.nickname,
-        type: message.data.type, // "question" 또는 "answer"
-        text: message.data.text,
-        timestamp: message.data.timestamp,
-        isCorrect: null, // 정답 여부 (정답 처리 전)
-        hostAnswer: null, // 호스트 답변 (답변 전)
-        processedAt: null, // ⭐️ 처리 시각 필드 추가
+        const responseChannel = ably.channels.get(
+          `participant-response:${requestId}`
+        );
+        await responseChannel.publish("check-response", {
+          available: isAvailable,
+        });
       };
-      setInputs((prev) => [...prev, input]);
-    };
-    participantChannel.subscribe("participant-input", participantInputHandler);
+      participantChannel.subscribe("nickname-check", nicknameCheckHandler);
 
-    return () => {
-      // 컴포넌트 언마운트 시 구독 해제
-      participantChannel.unsubscribe("nickname-check", nicknameCheckHandler);
-      participantChannel.unsubscribe("new-participant", newParticipantHandler);
-      participantChannel.unsubscribe(
+      // 새 참가자 등록
+      newParticipantHandler = (message) => {
+        const nickname = message.data.nickname;
+        setParticipants((prev) => {
+          if (!prev.includes(nickname)) {
+            return [...prev, nickname];
+          }
+          return prev;
+        });
+      };
+      participantChannel.subscribe("new-participant", newParticipantHandler);
+
+      // 참가자 입력(질문/정답) 받기 핸들러
+      participantInputHandler = (message) => {
+        console.log("참가자 입력 수신:", message.data);
+        const input = {
+          id: uuidv4(),
+          nickname: message.data.nickname,
+          type: message.data.type, // "question" 또는 "answer"
+          text: message.data.text,
+          timestamp: message.data.timestamp,
+          isCorrect: null, // 정답 여부 (정답 처리 전)
+          hostAnswer: null, // 호스트 답변 (답변 전)
+          processedAt: null, // ⭐️ 처리 시각 필드 추가
+        };
+        setInputs((prev) => [...prev, input]);
+      };
+      participantChannel.subscribe(
         "participant-input",
         participantInputHandler
       );
-    };
-  }, []);
+    }
 
-  // 4. 상태 변경 시 sessionStorage에 저장 (isLoaded 이후에만 실행)
+    return () => {
+      // 컴포넌트 언마운트 시 또는 isAuthenticated 변경 시 구독 해제
+      if (participantChannel) {
+        participantChannel.unsubscribe("nickname-check", nicknameCheckHandler);
+        participantChannel.unsubscribe(
+          "new-participant",
+          newParticipantHandler
+        );
+        participantChannel.unsubscribe(
+          "participant-input",
+          participantInputHandler
+        );
+      }
+    };
+  }, [isAuthenticated, isLoaded]); // ⭐️ isLoaded는 Hydration 문제 방지용, isAuthenticated는 인증 시 구독 시작용
+
+  // 4. 상태 변경 시 sessionStorage에 저장
   useEffect(() => {
     if (isLoaded) saveState(QUIZ_KEY, currentQuiz);
   }, [currentQuiz, isLoaded]);
@@ -123,6 +142,28 @@ export default function HostContainer() {
   useEffect(() => {
     if (isLoaded) saveState(INPUTS_KEY, inputs);
   }, [inputs, isLoaded]);
+
+  // ⭐️ 인증 상태 변경 시 sessionStorage에 저장
+  useEffect(() => {
+    if (isLoaded) sessionStorage.setItem(AUTH_KEY, isAuthenticated.toString());
+  }, [isAuthenticated, isLoaded]);
+
+  // ⭐️ 로그인 핸들러: 깜빡임 방지를 위해 상태 업데이트를 먼저 처리
+  const handleLogin = (success) => {
+    if (success) {
+      // 1. 먼저 인증 상태를 즉시 업데이트
+      setIsAuthenticated(true);
+
+      // 2. SweetAlert2 알림을 띄웁니다.
+      Swal.fire({
+        title: "접속 성공!",
+        text: "호스트 콘솔에 접근했습니다.",
+        icon: "success",
+        timer: 3000,
+        showConfirmButton: false,
+      });
+    }
+  };
 
   // 5. 퀴즈 입력 및 전송
   const handleQuizSubmit = useCallback(async (quizText) => {
@@ -159,7 +200,7 @@ export default function HostContainer() {
             ? {
                 ...input,
                 hostAnswer: answer,
-                processedAt: Date.now(), // ⭐️ 처리 시각 기록
+                processedAt: Date.now(),
               }
             : input
         )
@@ -207,14 +248,14 @@ export default function HostContainer() {
             ? {
                 ...input,
                 isCorrect: isCorrect,
-                processedAt: Date.now(), // ⭐️ 처리 시각 기록
+                processedAt: Date.now(),
               }
             : input
         )
       );
 
       const feedbackData = {
-        type: "feedback", // ⭐️ QNA_CHANNEL에 발행할 때 사용될 타입
+        type: "feedback",
         nickname: selectedInput.nickname,
         text: selectedInput.text,
         isCorrect: isCorrect,
@@ -227,7 +268,7 @@ export default function HostContainer() {
         const participantChannel = ably.channels.get(PARTICIPANT_CHANNEL);
         await participantChannel.publish("answer-feedback", feedbackData);
 
-        // 2) ⭐️ QNA_CHANNEL에 피드백 전송 (모두에게 공유되는 공개 기록용)
+        // 2) QNA_CHANNEL에 피드백 전송 (모두에게 공유되는 공개 기록용)
         const qnaChannel = ably.channels.get(QNA_CHANNEL);
         await qnaChannel.publish("qna-update", feedbackData);
       } catch (err) {
@@ -321,24 +362,26 @@ export default function HostContainer() {
     );
   }
 
-  // 10. Presenter에 전달할 데이터 준비
-  // 미처리 질문: 답변이 없는 질문
+  // ⭐️ 인증되지 않았다면 로그인 컴포넌트를 렌더링합니다.
+  if (!isAuthenticated) {
+    return <HostLogin onLogin={handleLogin} />;
+  }
+
+  // 10. Presenter에 전달할 데이터 준비 (인증 성공 시만 실행)
   const questions = inputs.filter(
     (i) => i.type === "question" && !i.hostAnswer
   );
-  // 미처리 정답: 정답 여부가 결정되지 않은 정답 제출
   const answers = inputs.filter(
     (i) => i.type === "answer" && i.isCorrect === null
   );
 
-  // ⭐️ 처리된 기록(리스트) 필터링
+  // ⭐️ 처리된 기록(리스트) 필터링 및 정렬
   const rawProcessedList = inputs.filter(
     (i) =>
       (i.type === "question" && i.hostAnswer) ||
       (i.type === "answer" && i.isCorrect !== null)
   );
 
-  // ⭐️ 처리 시각(processedAt)을 기준으로 오름차순 정렬 (오래된 것이 위, 최신이 아래)
   const processedList = rawProcessedList.sort(
     (a, b) => a.processedAt - b.processedAt
   );
