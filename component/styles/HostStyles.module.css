@@ -1,0 +1,252 @@
+/* styles/HostStyles.module.css */
+.wrapper {
+  padding: 20px;
+  min-height: 100vh;
+  background-color: var(--background-color);
+  color: var(--text-color);
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 30px;
+  padding: 20px;
+  background-color: var(--card-background);
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+}
+
+.title {
+  color: var(--primary-color);
+  margin-bottom: 15px;
+}
+
+.quizForm {
+  display: flex;
+  gap: 10px;
+  max-width: 800px;
+  margin: 0 auto 15px;
+}
+
+.quizInput {
+  flex-grow: 1;
+  padding: 12px;
+  background-color: #2a2a2a;
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+.quizButton {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 4px;
+  background-color: var(--secondary-color);
+  color: var(--background-color);
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.quizButton:hover {
+  background-color: #00b09c;
+}
+
+.currentQuiz,
+.participantCount {
+  color: #aaa;
+  font-size: 0.9em;
+}
+
+.mainContent {
+  display: flex;
+  gap: 20px;
+}
+
+.sectionTitle {
+  color: var(--primary-color);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+}
+
+.inputList {
+  /* max-height: 65vh; */
+  overflow-y: auto;
+  padding-right: 10px;
+}
+
+/* 개별 질문/답변 셀 스타일 */
+.cell {
+  padding: 15px 10px;
+  margin-bottom: 15px;
+  background-color: #252525;
+  border-radius: 6px;
+  border-left: 5px solid var(--primary-color);
+  position: relative;
+}
+
+.cell[data-processed="true"] {
+  border-left-color: #555; /* 처리 완료된 것은 색상 변경 */
+}
+
+.cellHeader {
+  font-weight: bold;
+  color: var(--secondary-color);
+  margin-bottom: 5px;
+  font-size: 0.9em;
+}
+
+.cellContent {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 1.5em;
+  word-wrap: break-word;
+}
+
+.cellForm {
+  display: flex;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.cellInput {
+  flex-grow: 1;
+  padding: 8px;
+  background-color: #333;
+  color: var(--text-color);
+  border: 1px solid #555;
+  border-radius: 3px;
+}
+
+.answerButton {
+  padding: 8px 15px;
+  background-color: var(--primary-color);
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.decisionGroup {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.correctButton,
+.incorrectButton {
+  padding: 10px 15px;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  flex: 1;
+}
+
+.correctButton {
+  background-color: #2e7d32; /* 진한 초록 */
+  color: #fff;
+}
+
+.incorrectButton {
+  background-color: #c62828; /* 진한 빨강 */
+  color: #fff;
+}
+
+.correctButton:disabled,
+.incorrectButton:disabled {
+  background-color: #555;
+  cursor: default;
+}
+
+.emptyMessage {
+  text-align: center;
+  color: #888;
+  padding: 20px;
+}
+
+/* HostStyles.module.css */
+
+.mainContent {
+  display: flex; /* Flexbox 활성화 */
+  gap: 20px; /* 섹션 간 간격 */
+  padding: 20px;
+  background-color: #242424;
+  flex-wrap: nowrap; /* 섹션이 줄바꿈되지 않도록 설정 */
+}
+
+/* 세 섹션이 동일한 너비를 갖도록 설정 */
+.leftSection,
+.centerSection,
+.rightSection {
+  flex: 1; /* 모든 섹션이 남은 공간을 균등하게 차지 */
+  min-width: 300px; /* 최소 너비 설정 */
+  background-color: #1e1e1e;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.rightSection {
+  flex: 2; /* 오른쪽 섹션이 더 넓게 */
+}
+
+/* 처리된 기록의 시각적 구분 */
+.statusAnswered {
+  color: #4caf50; /* Green */
+  font-weight: bold;
+  margin-left: 10px;
+}
+.statusCorrect {
+  color: #2196f3; /* Blue */
+  font-weight: bold;
+  margin-left: 10px;
+}
+.statusIncorrect {
+  color: #f44336; /* Red */
+  font-weight: bold;
+  margin-left: 10px;
+}
+.processedAnswer {
+  margin-top: 10px;
+  padding: 8px;
+  background-color: #333;
+  border-left: 3px solid #666;
+  border-radius: 4px;
+}
+.hostAnswerTitle {
+  font-size: 0.9em;
+  color: #bbb;
+  margin-bottom: 5px;
+}
+.hostAnswerContent {
+  font-weight: bold;
+  color: #fff;
+}
+
+.deleteButton {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: #d33;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.deleteButton:hover {
+  opacity: 1;
+  background: #e74c3c;
+}

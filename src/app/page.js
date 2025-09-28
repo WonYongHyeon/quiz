@@ -1,6 +1,6 @@
-import Main from "../../component/main/main.container";
-
+// app/page.js
+import MainContainer from "../../component/containers/MainContainer";
 
 export default function MainPage() {
-  return <Main/>;
+  return <MainContainer />;
 }

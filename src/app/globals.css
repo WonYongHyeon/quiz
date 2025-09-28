@@ -40,3 +40,19 @@ a {
     color-scheme: dark;
   }
 }
+
+:root {
+  --background-color: #121212; /* 다크 그레이 */
+  --text-color: #e0e0e0; /* 밝은 회색 */
+  --primary-color: #bb86fc; /* 보라색 계열 강조 */
+  --secondary-color: #03dac6; /* 민트색 계열 강조 */
+  --card-background: #1e1e1e;
+  --border-color: #333333;
+}
+
+body {
+  background-color: var(--background-color);
+  color: var(--text-color);
+  margin: 0;
+  padding: 0;
+}
