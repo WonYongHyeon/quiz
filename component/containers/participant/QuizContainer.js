@@ -25,6 +25,35 @@ export default function QuizContainer() {
   // 저장 활성화 플래그 (초기값 false)
   const [isSavingEnabled, setIsSavingEnabled] = useState(false);
 
+  // 강퇴 관련 구독
+  useEffect(() => {
+    const participantChannel = ably.channels.get(PARTICIPANT_CHANNEL);
+    const currentDeviceId = sessionStorage.getItem("current_device_id");
+    console.log(currentDeviceId);
+    const kickHandler = (message) => {
+      const { kick } = message.data;
+
+      if (kick) {
+        Swal.fire({
+          icon: "warning",
+          title: "강퇴되었습니다.",
+          text: "호스트에 의해 강퇴되었습니다. 다시 접속할 수 없습니다.",
+          confirmButtonText: "확인",
+        }).then(() => {
+          sessionStorage.clear();
+          router.replace("/participant/login");
+        });
+      }
+    };
+    participantChannel.subscribe(
+      `participant-kicked:${currentDeviceId}`,
+      kickHandler
+    );
+    return () => {
+      participantChannel.unsubscribe();
+    };
+  }, [router]);
+
   // QnA 기록이 변경될 때마다 sessionStorage에 저장
   useEffect(() => {
     if (isSavingEnabled && typeof window !== "undefined") {

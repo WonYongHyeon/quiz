@@ -11,6 +11,7 @@ import {
 } from "@/lib/ably";
 import { v4 as uuidv4 } from "uuid";
 import Swal from "sweetalert2";
+import ParticipantKickModal from "../../presenters/host/ParticipantKickModal";
 
 // sessionStorage 키 정의
 const PARTICIPANTS_KEY = "host_participants";
@@ -34,6 +35,8 @@ export default function HostContainer() {
   const [inputs, setInputs] = useState([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isKickModalOpen, setIsKickModalOpen] = useState(false);
+  const [bannedDeviceIds, setBannedDeviceIds] = useState([]);
 
   // 2. 무한 루프 방지를 위해 participants의 최신 값을 참조할 Ref 사용
   const participantsRef = useRef(participants);
@@ -44,7 +47,7 @@ export default function HostContainer() {
   // 3. ⭐️ 초기 데이터 로드 및 Ably 구독 설정 (두 개의 useEffect를 통합)
   useEffect(() => {
     let participantChannel;
-    let nicknameCheckHandler, newParticipantHandler, participantInputHandler;
+    let newParticipantHandler, participantInputHandler;
 
     if (typeof window !== "undefined" && !isLoaded) {
       // a. 데이터 로드 및 상태 설정 (Hydration 오류 방지)
@@ -66,29 +69,68 @@ export default function HostContainer() {
     if (isAuthenticated) {
       participantChannel = ably.channels.get(PARTICIPANT_CHANNEL);
 
-      // 닉네임 중복 체크 요청 처리
-      nicknameCheckHandler = async (message) => {
-        const { nickname: nicknameToCheck, responseTo: requestId } =
-          message.data;
-        const isAvailable = !participantsRef.current.includes(nicknameToCheck);
-
-        const responseChannel = ably.channels.get(
-          `participant-response:${requestId}`
-        );
-        await responseChannel.publish("check-response", {
-          available: isAvailable,
-        });
-      };
-      participantChannel.subscribe("nickname-check", nicknameCheckHandler);
-
       // 새 참가자 등록
       newParticipantHandler = (message) => {
-        const nickname = message.data.nickname;
+        const { nickname, deviceId } = message.data;
+        console.log("새 참가자 요청:", message.data);
+
+        const bannedDeviceIds =
+          JSON.parse(sessionStorage.getItem("banned_device_ids")) || [];
+
+        // 강퇴된 디바이스 ID인지 확인
+        if (bannedDeviceIds.includes(deviceId)) {
+          console.log(`강퇴된 디바이스 ID의 접속 시도: ${deviceId}`);
+          const channel = ably.channels.get(PARTICIPANT_CHANNEL);
+          channel.publish(`login-response:${deviceId}`, {
+            checked: false,
+            reason: "강퇴된 참가자입니다. 접속이 거부되었습니다.",
+            nickname,
+            deviceId,
+          });
+          return; // 이후 로직 실행 방지
+        }
+
+        // 디바이스 ID 중복 확인
+        if (participantsRef.current.some((p) => p.deviceId === deviceId)) {
+          console.log(`중복된 디바이스 ID: ${deviceId}`);
+          const channel = ably.channels.get(PARTICIPANT_CHANNEL);
+          channel.publish(`login-response:${deviceId}`, {
+            checked: false,
+            reason: "중복된 디바이스 ID로 접속이 거부되었습니다.",
+            nickname,
+            deviceId,
+          });
+          return; // 이후 로직 실행 방지
+        }
+
+        // 닉네임 중복 확인
+        if (participantsRef.current.some((p) => p.nickname === nickname)) {
+          console.log(`중복된 닉네임: ${nickname}`);
+          const channel = ably.channels.get(PARTICIPANT_CHANNEL);
+          channel.publish(`login-response:${deviceId}`, {
+            checked: false,
+            reason: "중복된 닉네임으로 접속이 거부되었습니다.",
+            nickname,
+            deviceId,
+          });
+          return; // 이후 로직 실행 방지
+        }
+
+        // 새로운 참가자 추가
+        const newParticipant = { nickname, deviceId };
         setParticipants((prev) => {
-          if (!prev.includes(nickname)) {
-            return [...prev, nickname];
-          }
-          return prev;
+          const updated = [...prev, newParticipant];
+          console.log("참가자 추가: ", updated); // 디버깅 로그 추가
+          sessionStorage.setItem(PARTICIPANTS_KEY, JSON.stringify(updated));
+          return updated;
+        });
+
+        const channel = ably.channels.get(PARTICIPANT_CHANNEL);
+        channel.publish(`login-response:${deviceId}`, {
+          checked: true,
+          message: "로그인이 허용되었습니다.",
+          nickname,
+          deviceId,
         });
       };
       participantChannel.subscribe("new-participant", newParticipantHandler);
@@ -117,7 +159,6 @@ export default function HostContainer() {
     return () => {
       // 컴포넌트 언마운트 시 또는 isAuthenticated 변경 시 구독 해제
       if (participantChannel) {
-        participantChannel.unsubscribe("nickname-check", nicknameCheckHandler);
         participantChannel.unsubscribe(
           "new-participant",
           newParticipantHandler
@@ -345,7 +386,40 @@ export default function HostContainer() {
     });
   }, []);
 
-  // 9. Hydration 완료 전에는 로딩 UI 반환
+  // 9. 참가자 강퇴 핸들러
+  const handleKickParticipant = (deviceId) => {
+    // 밴 아이디 리스트에 추가
+    setBannedDeviceIds((prev) => {
+      const updatedBannedList = [...prev, deviceId];
+      sessionStorage.setItem(
+        "banned_device_ids",
+        JSON.stringify(updatedBannedList)
+      );
+      console.log(updatedBannedList);
+      return updatedBannedList;
+    });
+
+    // 참가자 리스트에서 해당 디바이스 ID를 가진 참가자 삭제
+    setParticipants((prevParticipants) =>
+      prevParticipants.filter(
+        (participant) => participant.deviceId !== deviceId
+      )
+    );
+    sessionStorage.setItem(
+      PARTICIPANTS_KEY,
+      JSON.stringify(
+        participants.filter((participant) => participant.deviceId !== deviceId)
+      )
+    );
+
+    // 강퇴된 참가자에게 알림 및 로그인 화면으로 이동
+    const channel = ably.channels.get(PARTICIPANT_CHANNEL);
+    channel.publish(`participant-kicked:${deviceId}`, {
+      kick: true,
+    });
+  };
+
+  // 10. Hydration 완료 전에는 로딩 UI 반환
   if (!isLoaded) {
     return (
       <div
@@ -367,7 +441,7 @@ export default function HostContainer() {
     return <HostLogin onLogin={handleLogin} />;
   }
 
-  // 10. Presenter에 전달할 데이터 준비 (인증 성공 시만 실행)
+  // 11. Presenter에 전달할 데이터 준비 (인증 성공 시만 실행)
   const questions = inputs.filter(
     (i) => i.type === "question" && !i.hostAnswer
   );
@@ -386,17 +460,32 @@ export default function HostContainer() {
     (a, b) => a.processedAt - b.processedAt
   );
 
+  const onKickModalOpen = () => {
+    setIsKickModalOpen(true);
+  };
+
   return (
-    <HostPresenter
-      currentQuiz={currentQuiz}
-      participants={participants}
-      questions={questions}
-      answers={answers}
-      processedList={processedList}
-      onQuizSubmit={handleQuizSubmit}
-      onHostAnswerSubmit={handleHostAnswerSubmit}
-      onAnswerDecision={handleAnswerDecision}
-      onDeleteInput={handleDeleteInput}
-    />
+    <>
+      <HostPresenter
+        currentQuiz={currentQuiz}
+        participants={participants}
+        questions={questions}
+        answers={answers}
+        processedList={processedList}
+        onQuizSubmit={handleQuizSubmit}
+        onHostAnswerSubmit={handleHostAnswerSubmit}
+        onAnswerDecision={handleAnswerDecision}
+        onDeleteInput={handleDeleteInput}
+        onKickModalOpen={onKickModalOpen} // Pass the function to HostPresenter
+      />
+
+      {isKickModalOpen && (
+        <ParticipantKickModal
+          participants={participants}
+          onClose={() => setIsKickModalOpen(false)}
+          onKick={handleKickParticipant}
+        />
+      )}
+    </>
   );
 }

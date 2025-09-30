@@ -11,7 +11,8 @@ export default function HostLogin({ onLogin }) {
     setError("");
 
     // 💡 실제 비밀번호는 환경 변수 (NEXT_PUBLIC_HOST_PASSWORD) 또는 '1234'를 사용합니다.
-    const CORRECT_PASSWORD = process.env.NEXT_PUBLIC_HOST_PASSWORD || "1234";
+    const CORRECT_PASSWORD =
+      process.env.NEXT_PUBLIC_HOST_PASSWORD || "pigvelyn";
 
     if (password === CORRECT_PASSWORD) {
       onLogin(true);

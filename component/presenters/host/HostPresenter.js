@@ -130,6 +130,7 @@ export default function HostPresenter({
   onHostAnswerSubmit,
   onAnswerDecision,
   onDeleteInput, // ⭐️ 삭제 핸들러 props 받기
+  onKickModalOpen, // 강퇴 관리 모달 열기 핸들러
 }) {
   const [quizInput, setQuizInput] = useState(currentQuiz || "");
 
@@ -156,12 +157,17 @@ export default function HostPresenter({
             퀴즈 전송
           </button>
         </form>
-        <p className={styles.currentQuiz}>
-          현재 퀴즈: {currentQuiz || "입력 대기 중"}
-        </p>
-        <p className={styles.participantCount}>
-          참가자 수: {participants.length}명
-        </p>
+        <div className={styles.quizInfoRow}>
+          <p className={styles.currentQuiz}>
+            현재 퀴즈: {currentQuiz || "입력 대기 중"}
+          </p>
+          <p className={styles.participantCount}>
+            참가자 수: {participants.length}명
+          </p>
+          <button className={styles.kickButton} onClick={onKickModalOpen}>
+            강퇴 관리
+          </button>
+        </div>
       </header>
 
       <div className={styles.mainContent}>
