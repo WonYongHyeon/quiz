@@ -24,6 +24,7 @@
 .mainContent {
   display: flex;
   gap: 20px;
+  width: 100%;
 }
 
 .inputSection,
@@ -102,6 +103,7 @@
   background-color: #252525;
   border-radius: 4px;
   border-left: 4px solid var(--secondary-color);
+  word-wrap: break-word;
 }
 
 .hostResponse {
@@ -150,6 +152,9 @@
   border-radius: 6px;
   font-weight: bold;
   /* color: #27ae60; */
+  white-space: normal !important; /* 줄바꿈 유지 */
+  overflow-wrap: break-word !important; /* 긴 단어도 줄바꿈 */
+  word-break: break-word; /* 추가적인 줄바꿈 옵션 */
 }
 
 /* ⭐️ 오답 처리 피드백 스타일 (새로 추가) */
@@ -161,4 +166,13 @@
   border-radius: 6px;
   font-weight: bold;
   color: #e74c3c;
+  white-space: normal !important; /* 줄바꿈 유지 */
+  overflow-wrap: break-word !important; /* 긴 단어도 줄바꿈 */
+  word-break: break-word; /* 추가적인 줄바꿈 옵션 */
+}
+
+.qnaText {
+  white-space: normal !important; /* 줄바꿈 유지 */
+  overflow-wrap: break-word !important; /* 긴 단어도 줄바꿈 */
+  word-break: break-word; /* 추가적인 줄바꿈 옵션 */
 }

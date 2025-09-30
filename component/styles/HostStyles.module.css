@@ -101,6 +101,9 @@
   margin-bottom: 10px;
   font-size: 1.5em;
   word-wrap: break-word;
+  white-space: normal !important; /* 줄바꿈 유지 */
+  overflow-wrap: break-word !important; /* 긴 단어도 줄바꿈 */
+  word-break: break-word; /* 추가적인 줄바꿈 옵션 */
 }
 
 .cellForm {

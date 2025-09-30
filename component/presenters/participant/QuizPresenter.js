@@ -154,8 +154,8 @@ export default function QuizPresenter({
                         : styles.qnaQuestionItem
                     }
                   >
-                    <p>
-                      <strong>{qna.nickname}</strong>: {qna.text}
+                    <p className={styles.qnaText}>
+                      <strong>{qna.nickname}</strong> : {qna.text}
                     </p>
                     {qna.hostAnswer && (
                       <p className={styles.hostResponse}>
