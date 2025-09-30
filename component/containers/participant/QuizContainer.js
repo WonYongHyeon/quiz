@@ -10,7 +10,7 @@ import {
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
 
-const MAX_QNA_INTERVAL = 10 * 1000; // 10초 후 질문 가능
+const MAX_QNA_INTERVAL = 5 * 60 * 1000; // 5분 후 질문 가능
 const QNA_HISTORY_KEY = "qna_history";
 
 export default function QuizContainer() {
