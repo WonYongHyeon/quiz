@@ -355,3 +355,12 @@
   font-size: 14px;
   padding: 20px 0;
 }
+
+.participantManagement {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  margin-top: 10px;
+  gap: 15px;
+}

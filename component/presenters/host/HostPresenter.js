@@ -161,12 +161,14 @@ export default function HostPresenter({
           <p className={styles.currentQuiz}>
             현재 퀴즈: {currentQuiz || "입력 대기 중"}
           </p>
-          <p className={styles.participantCount}>
-            참가자 수: {participants.length}명
-          </p>
-          <button className={styles.kickButton} onClick={onKickModalOpen}>
-            강퇴 관리
-          </button>
+          <div className={styles.participantManagement}>
+            <p className={styles.participantCount}>
+              참가자 수: {participants.length}명
+            </p>
+            <button className={styles.kickButton} onClick={onKickModalOpen}>
+              참가자 관리
+            </button>
+          </div>
         </div>
       </header>
 
